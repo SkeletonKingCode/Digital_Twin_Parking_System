@@ -23,19 +23,15 @@ from datetime import datetime
 # Config
 # ---------------------------------------------------------------------------
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
-REFRESH_INTERVAL = int(os.environ.get("REFRESH_INTERVAL", "5"))   # seconds
+DEFAULT_REFRESH = int(os.environ.get("REFRESH_INTERVAL", "5"))
 
-WEATHER_OPTIONS  = ["ALL", "SUNNY", "OVERCAST", "RAINY"]
-CAMERA_OPTIONS   = [f"camera{i}" for i in range(1, 10)]
+WEATHER_OPTIONS = ["ALL", "SUNNY", "OVERCAST", "RAINY"]
+CAMERA_OPTIONS  = [f"camera{i}" for i in range(1, 10)]
 
-# Colour palette
-CLR_FREE     = "#22c55e"   # green
-CLR_MEDIUM   = "#f59e0b"   # amber
-CLR_BUSY     = "#ef4444"   # red
-CLR_UNKNOWN  = "#6b7280"   # grey
-CLR_BG       = "#0f172a"   # slate-900
-CLR_CARD     = "#1e293b"   # slate-800
-CLR_BORDER   = "#334155"   # slate-700
+CLR_FREE    = "#22c55e"
+CLR_MEDIUM  = "#f59e0b"
+CLR_BUSY    = "#ef4444"
+CLR_UNKNOWN = "#6b7280"
 
 ALERT_ICONS = {
     "lot_full":    "🔴",
@@ -47,7 +43,6 @@ ALERT_LABELS = {
     "nearly_full": "Nearly Full (≥80%)",
     "lot_empty":   "Lot Empty (≤10%)",
 }
-
 
 # ---------------------------------------------------------------------------
 # Page setup
@@ -61,7 +56,6 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* ── Global ── */
     html, body, [data-testid="stAppViewContainer"] {
         background: #0f172a;
         color: #e2e8f0;
@@ -71,14 +65,12 @@ st.markdown("""
         background: #1e293b !important;
         border-right: 1px solid #334155;
     }
-    /* ── Metric cards ── */
     [data-testid="stMetric"] {
         background: #1e293b;
         border: 1px solid #334155;
         border-radius: 8px;
         padding: 12px 16px;
     }
-    /* ── Section headers ── */
     .section-header {
         font-size: 0.65rem;
         letter-spacing: 0.15em;
@@ -87,7 +79,6 @@ st.markdown("""
         margin-bottom: 0.5rem;
         margin-top: 1.5rem;
     }
-    /* ── Camera card ── */
     .cam-card {
         background: #1e293b;
         border: 1px solid #334155;
@@ -108,19 +99,8 @@ st.markdown("""
         font-weight: 700;
         line-height: 1.1;
     }
-    /* ── Spot grid ── */
-    .spot-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        margin-top: 6px;
-    }
-    .spot {
-        width: 14px;
-        height: 14px;
-        border-radius: 3px;
-    }
-    /* ── Alert badge ── */
+    .spot-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .spot { width: 14px; height: 14px; border-radius: 3px; }
     .alert-badge {
         display: inline-block;
         padding: 4px 10px;
@@ -138,26 +118,21 @@ st.markdown("""
 # ---------------------------------------------------------------------------
 # Backend helpers
 # ---------------------------------------------------------------------------
-@st.cache_data(ttl=REFRESH_INTERVAL)
-def fetch_status():
+def fetch_status(ttl):
     try:
         r = requests.get(f"{BACKEND_URL}/status", timeout=5)
         return r.json() if r.ok else {}
     except Exception:
         return {}
 
-
-@st.cache_data(ttl=REFRESH_INTERVAL)
-def fetch_cameras():
+def fetch_cameras(ttl):
     try:
         r = requests.get(f"{BACKEND_URL}/cameras", timeout=5)
         return r.json().get("cameras", []) if r.ok else []
     except Exception:
         return []
 
-
-@st.cache_data(ttl=REFRESH_INTERVAL)
-def fetch_history(hours: int, camera: str | None, weather: str | None):
+def fetch_history(hours, camera, weather, ttl):
     params = {"hours": hours}
     if camera and camera != "ALL":
         params["camera"] = camera
@@ -169,26 +144,29 @@ def fetch_history(hours: int, camera: str | None, weather: str | None):
     except Exception:
         return []
 
-
-@st.cache_data(ttl=REFRESH_INTERVAL)
-def fetch_alerts():
+def fetch_alerts(ttl):
     try:
         r = requests.get(f"{BACKEND_URL}/alerts", timeout=5)
         return r.json().get("alerts", []) if r.ok else []
     except Exception:
         return []
 
-
-@st.cache_data(ttl=REFRESH_INTERVAL)
-def fetch_heatmap():
+def fetch_heatmap(ttl):
     try:
         r = requests.get(f"{BACKEND_URL}/heatmap", timeout=5)
         return r.json().get("data", []) if r.ok else []
     except Exception:
         return []
 
+def fetch_snapshot(camera: str) -> bytes | None:
+    """Fetch latest JPEG bytes for a camera. Not cached — always fresh."""
+    try:
+        r = requests.get(f"{BACKEND_URL}/snapshot/{camera}", timeout=5)
+        return r.content if r.ok else None
+    except Exception:
+        return None
 
-def occ_color(pct: float | None) -> str:
+def occ_color(pct):
     if pct is None:
         return CLR_UNKNOWN
     if pct >= 80:
@@ -211,28 +189,39 @@ with st.sidebar:
     sel_hours   = st.slider("History window (hours)", 1, 168, 24)
 
     st.divider()
-    st.markdown(f"<span style='font-size:0.7rem;color:#475569'>Refresh every {REFRESH_INTERVAL}s</span>", unsafe_allow_html=True)
-    st.markdown(f"<span style='font-size:0.7rem;color:#475569'>Backend: {BACKEND_URL}</span>", unsafe_allow_html=True)
+
+    refresh_rate = st.slider(
+        "Refresh rate (seconds)", min_value=1, max_value=60,
+        value=DEFAULT_REFRESH, step=1,
+    )
+
+    st.markdown(
+        f"<span style='font-size:0.7rem;color:#475569'>Refresh every {refresh_rate}s</span>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"<span style='font-size:0.7rem;color:#475569'>Backend: {BACKEND_URL}</span>",
+        unsafe_allow_html=True,
+    )
 
     if st.button("⟳ Force refresh"):
-        st.cache_data.clear()
         st.rerun()
 
 
 # ---------------------------------------------------------------------------
-# Load data
+# Load data — pass refresh_rate as a dummy ttl arg so cache busts on change
 # ---------------------------------------------------------------------------
-cameras_meta = fetch_cameras()
-status_data  = fetch_status()
+cameras_meta = fetch_cameras(refresh_rate)
+status_data  = fetch_status(refresh_rate)
 history_rows = fetch_history(
     sel_hours,
     None if sel_camera == "ALL" else sel_camera,
     None if sel_weather == "ALL" else sel_weather,
+    refresh_rate,
 )
-alerts_data  = fetch_alerts()
-heatmap_data = fetch_heatmap()
+alerts_data  = fetch_alerts(refresh_rate)
+heatmap_data = fetch_heatmap(refresh_rate)
 
-# Build camera → latest snapshot dict
 cam_latest: dict[str, dict] = {}
 for cm in cameras_meta:
     snap = cm.get("latest") or {}
@@ -256,20 +245,19 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Summary metrics
 total_slots_all = sum(v["total_slots"] for v in cam_latest.values())
 occupied_all    = sum(
     v["predicted_cars_parked"] for v in cam_latest.values()
     if v["predicted_cars_parked"] is not None
 )
-free_all        = total_slots_all - occupied_all
-overall_pct     = round(occupied_all / total_slots_all * 100, 1) if total_slots_all else 0.0
+free_all    = total_slots_all - occupied_all
+overall_pct = round(occupied_all / total_slots_all * 100, 1) if total_slots_all else 0.0
 
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Total Slots",    f"{total_slots_all}")
-c2.metric("Occupied",       f"{occupied_all}")
-c3.metric("Free",           f"{free_all}")
-c4.metric("Overall Occ %",  f"{overall_pct}%")
+c1.metric("Total Slots",   f"{total_slots_all}")
+c2.metric("Occupied",      f"{occupied_all}")
+c3.metric("Free",          f"{free_all}")
+c4.metric("Overall Occ %", f"{overall_pct}%")
 
 
 # ---------------------------------------------------------------------------
@@ -298,9 +286,8 @@ st.markdown('<p class="section-header">Camera Overview</p>', unsafe_allow_html=T
 
 cam_keys = sorted(cam_latest.keys())
 cols_per_row = 3
-rows = math.ceil(len(cam_keys) / cols_per_row)
 
-for r in range(rows):
+for r in range(math.ceil(len(cam_keys) / cols_per_row)):
     cols = st.columns(cols_per_row)
     for c in range(cols_per_row):
         idx = r * cols_per_row + c
@@ -316,7 +303,6 @@ for r in range(rows):
         with cols[c]:
             bar_width = int(pct or 0)
             pct_label = f"{pct:.1f}%" if pct is not None else "—"
-
             st.markdown(f"""
             <div class="cam-card">
               <div class="cam-title">{cam_id.replace('camera','Camera ')}</div>
@@ -335,30 +321,47 @@ for r in range(rows):
 
 
 # ---------------------------------------------------------------------------
-# Spot Grid for selected camera
+# Selected camera: snapshot image + spot grid
 # ---------------------------------------------------------------------------
 if sel_camera != "ALL":
-    st.markdown(f'<p class="section-header">Spot Grid — {sel_camera}</p>', unsafe_allow_html=True)
-    info     = cam_latest.get(sel_camera, {})
-    occupied = info.get("predicted_cars_parked", 0) or 0
-    total    = info.get("total_slots", 36)
-    free     = total - occupied
+    st.markdown(f'<p class="section-header">Live Snapshot — {sel_camera}</p>', unsafe_allow_html=True)
 
-    spots_html = '<div class="spot-grid">'
-    for i in range(total):
-        color = CLR_BUSY if i < occupied else CLR_FREE
-        spots_html += f'<div class="spot" style="background:{color}" title="Spot {i+1}"></div>'
-    spots_html += "</div>"
+    img_col, grid_col = st.columns([3, 2])
 
-    st.markdown(f"""
-    <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px;">
-      <div style="display:flex;gap:20px;margin-bottom:12px;">
-        <span style="font-size:0.8rem;color:#22c55e">● Free: {free}</span>
-        <span style="font-size:0.8rem;color:#ef4444">● Occupied: {occupied}</span>
-      </div>
-      {spots_html}
-    </div>
-    """, unsafe_allow_html=True)
+    with img_col:
+        img_bytes = fetch_snapshot(sel_camera)
+        if img_bytes:
+            st.image(img_bytes, use_container_width=True)
+        else:
+            st.markdown(
+                "<div style='background:#1e293b;border:1px solid #334155;border-radius:10px;"
+                "padding:40px;text-align:center;color:#475569;font-size:0.8rem'>"
+                "No image received yet</div>",
+                unsafe_allow_html=True,
+            )
+
+    with grid_col:
+        st.markdown(f'<p class="section-header">Spot Grid — {sel_camera}</p>', unsafe_allow_html=True)
+        info     = cam_latest.get(sel_camera, {})
+        occupied = info.get("predicted_cars_parked", 0) or 0
+        total    = info.get("total_slots", 36)
+        free     = total - occupied
+
+        spots_html = '<div class="spot-grid">'
+        for i in range(total):
+            color = CLR_BUSY if i < occupied else CLR_FREE
+            spots_html += f'<div class="spot" style="background:{color}" title="Spot {i+1}"></div>'
+        spots_html += "</div>"
+
+        st.markdown(f"""
+        <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px;">
+          <div style="display:flex;gap:20px;margin-bottom:12px;">
+            <span style="font-size:0.8rem;color:#22c55e">● Free: {free}</span>
+            <span style="font-size:0.8rem;color:#ef4444">● Occupied: {occupied}</span>
+          </div>
+          {spots_html}
+        </div>
+        """, unsafe_allow_html=True)
 
 st.divider()
 
@@ -399,7 +402,7 @@ else:
 
 
 # ---------------------------------------------------------------------------
-# Heatmap — avg occupancy by hour × weather
+# Heatmap
 # ---------------------------------------------------------------------------
 st.markdown('<p class="section-header">Heatmap · Avg Occupancy by Hour of Day</p>', unsafe_allow_html=True)
 
@@ -407,8 +410,6 @@ if heatmap_data:
     df_hm = pd.DataFrame(heatmap_data)
     df_hm.columns = ["weather", "hour", "avg_occ"]
     df_pivot = df_hm.pivot(index="weather", columns="hour", values="avg_occ").fillna(0)
-
-    # Ensure all hours 0-23 exist
     for h in range(24):
         if h not in df_pivot.columns:
             df_pivot[h] = 0
@@ -439,5 +440,5 @@ else:
 # ---------------------------------------------------------------------------
 # Auto-refresh
 # ---------------------------------------------------------------------------
-time.sleep(REFRESH_INTERVAL)
+time.sleep(refresh_rate)
 st.rerun()

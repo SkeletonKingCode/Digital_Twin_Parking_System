@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS alerts (
 ALERT_THRESHOLDS = {
     "lot_full":    lambda pct: pct >= 95,
     "nearly_full": lambda pct: 80 <= pct < 95,
-    "lot_empty":   lambda pct: pct <= 10,
+    "lot_empty":   lambda pct: pct <= 0,
 }
 
 

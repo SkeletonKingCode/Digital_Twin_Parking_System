@@ -16,6 +16,7 @@ Run with:
     uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 """
 
+
 import os
 import io
 import csv
@@ -28,7 +29,7 @@ from typing import Optional
 
 from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -62,9 +63,14 @@ def _load_slot_counts():
                 reader = csv.DictReader(f)
                 SLOT_COUNTS[cam] = sum(1 for _ in reader)
         else:
-            SLOT_COUNTS[cam] = 36   # sensible default for CNR-EXT
+            SLOT_COUNTS[cam] = 36
 
 _load_slot_counts()
+
+# ---------------------------------------------------------------------------
+# In-memory snapshot store: camera -> raw JPEG bytes
+# ---------------------------------------------------------------------------
+_snapshots: dict[str, bytes] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -118,10 +124,10 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 @app.post("/detect")
 async def detect(
-    file:    UploadFile = File(...),
-    weather: str = Form("UNKNOWN"),
-    date:    str = Form(""),
-    camera:  str = Form("camera1"),
+    file:      UploadFile = File(...),
+    weather:   str = Form("UNKNOWN"),
+    date:      str = Form(""),
+    camera:    str = Form("camera1"),
     timestamp: str = Form(""),
 ):
     """
@@ -135,7 +141,10 @@ async def detect(
         tmp.write(contents)
         tmp.close()
 
-        metrics = run_inference(tmp.name, camera)
+        # Store raw bytes as the latest snapshot for this camera
+        _snapshots[camera] = contents
+
+        metrics = run_inference(tmp.name, camera, original_filename=file.filename)
     finally:
         os.unlink(tmp.name)
 
@@ -179,8 +188,26 @@ async def detect(
 
     # Push to WebSocket clients
     await manager.broadcast(payload)
-
     return JSONResponse(payload)
+
+
+# ---------------------------------------------------------------------------
+# GET /snapshot/{camera}  — latest raw image for a camera
+# ---------------------------------------------------------------------------
+@app.get("/snapshot/{camera}")
+def snapshot(camera: str):
+    data = _snapshots.get(camera)
+    if data is None:
+        raise HTTPException(status_code=404, detail="No snapshot yet for this camera")
+    return Response(content=data, media_type="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
+# GET /snapshots  — which cameras have a snapshot available
+# ---------------------------------------------------------------------------
+@app.get("/snapshots")
+def snapshots_index():
+    return {"cameras": list(_snapshots.keys())}
 
 
 # ---------------------------------------------------------------------------
@@ -200,9 +227,9 @@ def status():
 # ---------------------------------------------------------------------------
 @app.get("/history")
 def history(
-    hours:   int            = 24,
-    camera:  Optional[str]  = None,
-    weather: Optional[str]  = None,
+    hours:   int           = 24,
+    camera:  Optional[str] = None,
+    weather: Optional[str] = None,
 ):
     conn = get_conn()
     rows = get_history(conn, hours=hours, camera=camera, weather=weather)
@@ -219,7 +246,6 @@ def cameras():
     conn = get_conn()
     latest = get_latest_per_camera(conn)
     conn.close()
-
     result = []
     for cam_id, slots in SLOT_COUNTS.items():
         snap = next((r for r in latest if r["camera"] == cam_id), None)
@@ -243,7 +269,7 @@ def alerts(limit: int = 50):
 
 
 # ---------------------------------------------------------------------------
-# GET /heatmap  (bonus — used by dashboard)
+# GET /heatmap
 # ---------------------------------------------------------------------------
 @app.get("/heatmap")
 def heatmap():
