@@ -19,6 +19,9 @@ A real-time parking lot simulation and monitoring system built on top of a YOLOv
 │   └── all_black_mask.png        # Fallback mask (all-black = no masking)
 ├── dashboard/
 │   └── app.py                    # Streamlit dashboard
+├── assets/
+│   ├── models/                   # Where to store models used by inference_wrapper.py
+│   └── masks/                    # Masks of cameras are stored here 
 └── dataset/
     └── CNR-EXT_FULL_IMAGE_1000x750/
         ├── FULL_IMAGE_1000x750/
@@ -36,8 +39,6 @@ A real-time parking lot simulation and monitoring system built on top of a YOLOv
 - The CNR-EXT_FULL_IMAGE_1000x750 dataset in `dataset/`
 - YOLOv8n model weights at `assets/models/yolov8n.pt`
 - (Optional) Per-camera masks at `assets/masks/cnrpark_mask_camera{N}_1000_750_bw.png`
-- Your existing `utils.py` in the **parent** directory of `backend/`
-  (the inference script does `sys.path.append('..')` to find it)
 
 ---
 
