@@ -61,7 +61,7 @@ def run_inference(
     Returns
     -------
     dict with keys:
-        image_name, timestamp, predicted_cars, predicted_cars_parking,
+        image_name, timestamp, predicted_cars, predicted_cars_parked,
         processing_time   (and zeros/defaults if inference fails)
     """
     mask_file = get_mask_path(camera)
@@ -117,7 +117,7 @@ def run_inference(
             "image_name":              str(row.get("image_name", os.path.basename(image_path))),
             "timestamp":               str(row.get("timestamp", "")),
             "predicted_cars":          int(row.get("predicted_cars", 0) or 0),
-            "predicted_cars_parking":  int(row.get("predicted_cars_parking", 0)) if not pd.isna(row.get("predicted_cars_parking", 0)) else 10, #Error in detection
+            "predicted_cars_parked":  int(row.get("predicted_cars_parked", 0)) if not pd.isna(row.get("predicted_cars_parked", 0)) else  int(row.get("predicted_cars", 0) or 0), #Error in detection
             "processing_time":         float(row.get("processing_time", elapsed) or elapsed),
         }
 
@@ -131,6 +131,6 @@ def _empty_result(image_path: str, elapsed: float) -> dict:
         "image_name":             os.path.basename(image_path),
         "timestamp":              "",
         "predicted_cars":         0,
-        "predicted_cars_parking": 0,
+        "predicted_cars_parked": 0,
         "processing_time":        elapsed,
     }

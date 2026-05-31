@@ -129,7 +129,7 @@ def main(model,input_path, output_path,num_splits,mask_type, mask_file, savefigs
 
     print(divided_image_list)
 
-    columns = ['image_name','timestamp', 'predicted_cars','predicted_cars_parking', 'real_cars', 'accuracy','precision','recall','f1_score','start_time','end_time','processing_time']
+    columns = ['image_name','timestamp', 'predicted_cars','predicted_cars_parked', 'real_cars', 'accuracy','precision','recall','f1_score','start_time','end_time','processing_time']
 
 
 

@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS detection_events (
     camera                TEXT    NOT NULL,          -- e.g. 'camera1'
     image_name            TEXT    NOT NULL,
     predicted_cars        INTEGER,
-    predicted_cars_parking INTEGER,
+    predicted_cars_parked INTEGER,
     total_slots           INTEGER,
     occupancy_pct         REAL,
     processing_time       REAL,
@@ -73,7 +73,7 @@ def insert_event(
     camera: str,
     image_name: str,
     predicted_cars: int,
-    predicted_cars_parking: int,
+    predicted_cars_parked: int,
     total_slots: int,
     occupancy_pct: float,
     processing_time: float,
@@ -83,12 +83,12 @@ def insert_event(
         """
         INSERT INTO detection_events
             (timestamp, weather, date, camera, image_name,
-             predicted_cars, predicted_cars_parking, total_slots,
+             predicted_cars, predicted_cars_parked, total_slots,
              occupancy_pct, processing_time, inserted_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?)
         """,
         (timestamp, weather, date, camera, image_name,
-         predicted_cars, predicted_cars_parking, total_slots,
+         predicted_cars, predicted_cars_parked, total_slots,
          occupancy_pct, processing_time, inserted_at),
     )
     conn.commit()
@@ -163,7 +163,7 @@ def get_history(
     rows = conn.execute(
         f"""
         SELECT timestamp, weather, date, camera,
-               predicted_cars_parking, total_slots, occupancy_pct, inserted_at
+               predicted_cars_parked, total_slots, occupancy_pct, inserted_at
         FROM detection_events
         {where}
         ORDER BY inserted_at DESC

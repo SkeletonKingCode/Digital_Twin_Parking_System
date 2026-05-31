@@ -140,7 +140,7 @@ async def detect(
         os.unlink(tmp.name)
 
     # Derive values
-    predicted_parking = metrics["predicted_cars_parking"]
+    predicted_parking = metrics["predicted_cars_parked"]
     total_slots = SLOT_COUNTS.get(camera, 36)
     occupancy_pct = round((predicted_parking / total_slots) * 100, 1) if total_slots else 0.0
 
@@ -156,7 +156,7 @@ async def detect(
         camera=camera,
         image_name=file.filename,
         predicted_cars=metrics["predicted_cars"],
-        predicted_cars_parking=predicted_parking,
+        predicted_cars_parked=predicted_parking,
         total_slots=total_slots,
         occupancy_pct=occupancy_pct,
         processing_time=metrics["processing_time"],
@@ -170,7 +170,7 @@ async def detect(
         "timestamp":              ts,
         "weather":                weather.upper(),
         "predicted_cars":         metrics["predicted_cars"],
-        "predicted_cars_parking": predicted_parking,
+        "predicted_cars_parked": predicted_parking,
         "total_slots":            total_slots,
         "occupancy_pct":          occupancy_pct,
         "processing_time":        metrics["processing_time"],

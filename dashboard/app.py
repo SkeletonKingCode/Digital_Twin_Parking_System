@@ -238,7 +238,7 @@ for cm in cameras_meta:
     snap = cm.get("latest") or {}
     cam_latest[cm["camera"]] = {
         "total_slots":            cm.get("total_slots", 36),
-        "predicted_cars_parking": snap.get("predicted_cars_parking", None),
+        "predicted_cars_parked": snap.get("predicted_cars_parked", None),
         "occupancy_pct":          snap.get("occupancy_pct", None),
         "timestamp":              snap.get("timestamp", "—"),
         "weather":                snap.get("weather", "—"),
@@ -259,8 +259,8 @@ st.markdown(
 # Summary metrics
 total_slots_all = sum(v["total_slots"] for v in cam_latest.values())
 occupied_all    = sum(
-    v["predicted_cars_parking"] for v in cam_latest.values()
-    if v["predicted_cars_parking"] is not None
+    v["predicted_cars_parked"] for v in cam_latest.values()
+    if v["predicted_cars_parked"] is not None
 )
 free_all        = total_slots_all - occupied_all
 overall_pct     = round(occupied_all / total_slots_all * 100, 1) if total_slots_all else 0.0
@@ -309,7 +309,7 @@ for r in range(rows):
         cam_id   = cam_keys[idx]
         info     = cam_latest[cam_id]
         pct      = info["occupancy_pct"]
-        occupied = info["predicted_cars_parking"]
+        occupied = info["predicted_cars_parked"]
         total    = info["total_slots"]
         color    = occ_color(pct)
 
@@ -340,7 +340,7 @@ for r in range(rows):
 if sel_camera != "ALL":
     st.markdown(f'<p class="section-header">Spot Grid — {sel_camera}</p>', unsafe_allow_html=True)
     info     = cam_latest.get(sel_camera, {})
-    occupied = info.get("predicted_cars_parking", 0) or 0
+    occupied = info.get("predicted_cars_parked", 0) or 0
     total    = info.get("total_slots", 36)
     free     = total - occupied
 

@@ -241,7 +241,7 @@ def perform_inference_post(input_path, output_path, img_,img_object, model,df,ma
         new_row = {
             'image_name': img_name,
             'predicted_cars': cars,
-            'predicted_cars_parking': '',
+            'predicted_cars_parked': '',
             'processing_time': '-',
             }
 
@@ -353,7 +353,7 @@ def perform_inference(input_path, output_path, img_,img_object, model,df, save=F
         new_row = {
             'image_name': img_name,
             'predicted_cars': cars,
-            'predicted_cars_parking': '',
+            'predicted_cars_parked': '',
             'processing_time': '-',
             }
 

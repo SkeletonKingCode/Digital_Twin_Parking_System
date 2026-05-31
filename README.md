@@ -37,7 +37,7 @@ A real-time parking lot simulation and monitoring system built on top of a YOLOv
 
 - Python 3.11+
 - The CNR-EXT_FULL_IMAGE_1000x750 dataset in `dataset/`
-- YOLOv8n model weights at `assets/models/yolov8n.pt`
+- YOLOv8n or YOLO11m model weights at `assets/models/{yolov8n.pt , yolo11m.pt}`
 - (Optional) Per-camera masks at `assets/masks/cnrpark_mask_camera{N}_1000_750_bw.png`
 
 ---
@@ -133,12 +133,12 @@ Open http://localhost:8501 in your browser.
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/detect` | Upload image + metadata; runs inference, stores result |
-| `GET` | `/status` | Current occupancy snapshot for all cameras |
-| `GET` | `/cameras` | List cameras with slot counts + latest snapshot |
-| `GET` | `/history?hours=24&camera=camera1&weather=SUNNY` | Time-series occupancy |
-| `GET` | `/alerts` | Recent threshold alerts |
-| `GET` | `/heatmap` | Avg occupancy grouped by weather × hour of day |
-| `WS` | `/live` | WebSocket — pushes each detection result in real time |
+| `GET`  | `/status` | Current occupancy snapshot for all cameras |
+| `GET`  | `/cameras` | List cameras with slot counts + latest snapshot |
+| `GET`  | `/history?hours=24&camera=camera1&weather=SUNNY` | Time-series occupancy |
+| `GET`  | `/alerts` | Recent threshold alerts |
+| `GET`  | `/heatmap` | Avg occupancy grouped by weather × hour of day |
+| `WS`   | `/live` | WebSocket — pushes each detection result in real time |
 
 ### POST /detect body (multipart/form-data)
 
