@@ -1,4 +1,5 @@
 """
+backend/inference_wrapper.py
 inference_wrapper.py
 --------------------
 Wraps inference_yolo_ultralytics.py (called as a subprocess) so that the
@@ -29,7 +30,7 @@ import pandas as pd
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
 
-MODEL_PATH = os.path.join(_ROOT, "assets", "models", "yolo11m")   # no extension — script appends .pt/.tflite
+MODEL_PATH = os.path.join(_ROOT, "assets", "models", "yolo11m")   # no extension — script appends .pt
 MASK_DIR   = os.path.join(_ROOT, "assets", "masks")
 SCRIPT     = os.path.join(_HERE, "inference_yolo_ultralytics.py")
 
@@ -44,8 +45,7 @@ def get_mask_path(camera: str) -> str:
     candidate = os.path.join(MASK_DIR, f"cnrpark_mask_camera{num}_1000_750_bw.png")
     if os.path.exists(candidate):
         return candidate
-    fallback = os.path.join(_HERE, "all_black_mask.png")
-    return fallback
+    return os.path.join(_HERE, "all_black_mask.png")
 
 
 def run_inference(
@@ -54,6 +54,7 @@ def run_inference(
     *,
     model: str = MODEL_PATH,
     savefigs: str = "no",
+    original_filename: str = "",
 ) -> dict:
     """
     Run inference on a single image and return a metrics dict.
@@ -71,28 +72,24 @@ def run_inference(
     tmp_out = tempfile.mkdtemp(prefix="parking_out_")
 
     try:
-        # Copy image into the temp input dir so the script finds it
-        dest = os.path.join(tmp_in, os.path.basename(image_path))
+        # Use the original filename so extract_timestamp can parse the date pattern
+        fname = original_filename if original_filename else os.path.basename(image_path)
+        dest  = os.path.join(tmp_in, fname)
         shutil.copy2(image_path, dest)
 
         cmd = [
             sys.executable, SCRIPT,
-            "--model",      model,
-            "--input_path", tmp_in,
-            "--output_path",tmp_out,
-            "--mask_type",  "post",
-            "--mask_file",  mask_file,
-            "--savefigs",   savefigs,
-            "--num_splits", "1",
+            "--model",       model,
+            "--input_path",  tmp_in,
+            "--output_path", tmp_out,
+            "--mask_type",   "post",
+            "--mask_file",   mask_file,
+            "--savefigs",    savefigs,
+            "--num_splits",  "1",
         ]
 
         t0 = time.perf_counter()
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         elapsed = time.perf_counter() - t0
 
         if result.returncode != 0:
@@ -105,7 +102,7 @@ def run_inference(
             recursive=True,
         )
         if not csv_files:
-            print("[inference_wrapper] No CSV produced.")
+            print("[inference_wrapper] no CSV produced")
             return _empty_result(image_path, elapsed)
 
         df = pd.read_csv(csv_files[0])
@@ -113,11 +110,19 @@ def run_inference(
             return _empty_result(image_path, elapsed)
 
         row = df.iloc[-1]
+
+        # predicted_cars_parked holds the masked-area car count (same as predicted_cars
+        # for the post-mask pipeline — utils.py stores cars in both columns now)
+        raw_parking = row.get("predicted_cars_parked", None)
+        if pd.isna(raw_parking) or raw_parking == "" or raw_parking is None:
+            # fall back to predicted_cars if parking column is empty
+            raw_parking = row.get("predicted_cars", 0)
+
         return {
             "image_name":              str(row.get("image_name", os.path.basename(image_path))),
             "timestamp":               str(row.get("timestamp", "")),
             "predicted_cars":          int(row.get("predicted_cars", 0) or 0),
-            "predicted_cars_parked":  int(row.get("predicted_cars_parked", 0)) if not pd.isna(row.get("predicted_cars_parked", 0)) else  int(row.get("predicted_cars", 0) or 0), #Error in detection
+            "predicted_cars_parked":   int(float(raw_parking)) if raw_parking != "" else int(row.get("predicted_cars", 0) or 0),
             "processing_time":         float(row.get("processing_time", elapsed) or elapsed),
         }
 
