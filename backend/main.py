@@ -72,6 +72,12 @@ _load_slot_counts()
 # ---------------------------------------------------------------------------
 _snapshots: dict[str, bytes] = {}
 
+# most recently processed image + its detection metadata
+_latest_detection: dict = {
+    "camera": None,
+    "image":  None,   # raw bytes
+    "meta":   None,   # dict with occupancy/timestamp/weather etc.
+}
 
 # ---------------------------------------------------------------------------
 # WebSocket connection manager
@@ -186,6 +192,11 @@ async def detect(
         "alerts":                 new_alerts,
     }
 
+    # update the global latest-detection store
+    _latest_detection["camera"] = camera
+    _latest_detection["image"]  = contents
+    _latest_detection["meta"]   = payload
+
     # Push to WebSocket clients
     await manager.broadcast(payload)
     return JSONResponse(payload)
@@ -208,6 +219,27 @@ def snapshot(camera: str):
 @app.get("/snapshots")
 def snapshots_index():
     return {"cameras": list(_snapshots.keys())}
+
+
+# ---------------------------------------------------------------------------
+# GET /latest
+# ---------------------------------------------------------------------------
+@app.get("/latest")
+def latest_detection():
+    """Metadata of the most recently completed /detect call."""
+    if _latest_detection["camera"] is None:
+        raise HTTPException(status_code=404, detail="No detection yet")
+    return _latest_detection["meta"]
+ 
+ 
+@app.get("/latest/image")
+def latest_image():
+    """Raw JPEG of the most recently processed image."""
+    img = _latest_detection.get("image")
+    if img is None:
+        raise HTTPException(status_code=404, detail="No detection yet")
+    return Response(content=img, media_type="image/jpeg")
+ 
 
 
 # ---------------------------------------------------------------------------
