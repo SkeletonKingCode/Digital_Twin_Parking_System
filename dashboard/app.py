@@ -170,43 +170,36 @@ if "hours" not in st.session_state:
     st.session_state.hours = 24
 
 # ---------------------------------------------------------------------------
-# Sidebar controls
+# Sidebar
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("## 🅿 Smart Parking")
     st.markdown("*Digital Twin Dashboard*")
     st.divider()
 
-    with st.form(key="selection_form"):
-        # Set widget indices based on current session state
-        weather_idx = WEATHER_OPTIONS.index(st.session_state.weather) if st.session_state.weather in WEATHER_OPTIONS else 0
-        new_weather = st.selectbox("Weather condition", WEATHER_OPTIONS, index=weather_idx)
-
-        camera_list = ["ALL"] + CAMERA_OPTIONS
-        camera_idx = camera_list.index(st.session_state.camera) if st.session_state.camera in camera_list else 0
-        new_camera = st.selectbox("Camera", camera_list, index=camera_idx)
-
-        new_hours = st.slider("History window (hours)", 1, 168, st.session_state.hours)
-
-        submitted = st.form_submit_button("Apply & Refresh")
+    sel_weather = st.selectbox("Weather condition", WEATHER_OPTIONS, index=0)
+    sel_camera  = st.selectbox("Camera", ["ALL"] + CAMERA_OPTIONS, index=0)
+    sel_hours   = st.slider("History window (hours)", 1, 168, 24)
 
     st.divider()
-    refresh_rate = st.slider("Refresh rate (seconds)", min_value=1, max_value=60, value=5, step=1)
 
-    st.divider()
-    st.markdown(f"<span style='font-size:0.7rem;color:#475569'>Backend: {BACKEND_URL}</span>", unsafe_allow_html=True)
+    refresh_rate = st.slider(
+        "Refresh rate (seconds)", min_value=1, max_value=60,
+        value=10, step=1,
+    )
+
+    st.markdown(
+        f"<span style='font-size:0.7rem;color:#475569'>Refresh every {refresh_rate}s</span>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"<span style='font-size:0.7rem;color:#475569'>Backend: {BACKEND_URL}</span>",
+        unsafe_allow_html=True,
+    )
+
     if st.button("⟳ Force refresh"):
-        clear_cache_and_rerun()
+        st.rerun()
 
-if submitted:
-    st.session_state.weather = new_weather
-    st.session_state.camera = new_camera
-    st.session_state.hours = new_hours
-    clear_cache_and_rerun()
-
-sel_weather = st.session_state.weather
-sel_camera = st.session_state.camera
-sel_hours = st.session_state.hours
 
 # ---------------------------------------------------------------------------
 # Data fetching (fresh each cycle)
